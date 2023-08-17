@@ -81,7 +81,12 @@ async function authCheck(req, res, next){
 // Middleware
 //////////////////////////////
 // cors for preventing cors errors (allows all requests from other origins)
-app.use(cors());
+app.use(
+  cors({
+  origin: "http://localhost:3000",
+  credentials: true,
+  })
+);
 // cookie parser for reading cookies
 app.use(cookieParser());
 // morgan for logging requests
@@ -101,7 +106,7 @@ app.use(express.json());
 app.get("/people", authCheck, async (req, res) => {
   try {
     // fetch all people from database
-    const people = await People.find({});
+    const people = await People.find({username: req.payload.username});
     // send json of all people
     res.json(people);
   } catch (error) {
@@ -113,11 +118,13 @@ app.get("/people", authCheck, async (req, res) => {
 // CREATE - POST - /people - create a new person
 app.post("/people", authCheck, async (req, res) => {
   try {
+    req.body.username = req.payload.username
     // create the new person
     const person = await People.create(req.body);
     // add the username to the person
     person.username = req.payload.username; 
     // send newly created person as JSON
+    console.log(people)
     res.json(person);
   } catch (error) {
     res.status(400).json({ error });
@@ -207,7 +214,20 @@ app.post("/login", async (req, res) => {
   // create a token with the username in the payload
   const token = jwt.sign({ username: user.username }, process.env.SECRET);
   // send a response with a cookie that includes the token
-  res.cookie("token", token)
+  res.cookie("token", token, {
+    // can only be accessed by server requests
+    httpOnly: true,
+    // path = where the cookie is valid
+    path: "/",
+    // domain = what domain the cookie is valid on
+    domain: "localhost",
+    // secure = only send the cookie over https
+    secure: false,
+    // sameSite = only send cookie if the request is coming from the same origin
+    sameSite: "lax", // "strict" | "lax" | "none" (secure must be true)
+    // maxAge = how long the cookie is valid for in milliseconds
+    maxAge: 3600000, // 1 hour
+  });
   // send the user as json
   res.json(user);
   } catch (error){
@@ -220,7 +240,7 @@ app.get("/cookietest", (req, res) => {
   res.json(req.cookies);
 })
 
-// get  /logout to clear our cookie
+// get / logout to clear our cookie
 app.get("/logout", (req, res) => {
   res.clearCookie("token");
   res.json({ message: "You have been logged out" })
